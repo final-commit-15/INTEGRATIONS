@@ -1,0 +1,42 @@
+[tool.poetry]
+name = "agentforge-integrations"
+version = "0.1.0"
+description = "External-world execution layer for AgentForge"
+authors = ["Your Team <team@agentforge.ai>"]
+license = "MIT"
+readme = "README.md"
+packages = [
+    { include = "agentforge_integrations", from = "src" }
+]
+
+[tool.poetry.dependencies]
+PyJWT = ">=2.0.0"
+pydantic-settings = ">=2.0.0"
+aiofiles = ">=23.0.0"
+python = ">=3.11,<4.0"
+fastapi = ">=0.115.0"
+uvicorn = {extras = ["standard"], version = ">=0.30.0"}
+httpx = {extras = ["http2"], version = ">=0.27.0"}
+pydantic = {extras = ["email"], version = ">=2.0.0"}
+python-dotenv = ">=1.0.0"
+cryptography = ">=42.0.0"
+python-json-logger = ">=2.0.0"
+tenacity = ">=8.0.0"
+aioredis = {version = ">=2.0.0", optional = true}  # for rate limiting
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.0.0"
+pytest-asyncio = ">=0.21.0"
+pytest-cov = ">=5.0.0"
+black = ">=24.0.0"
+mypy = ">=1.8.0"
+isort = ">=5.13.0"
+ruff = ">=0.4.0"
+respx = ">=0.21.0"  # HTTP mocking
+
+[tool.poetry.scripts]
+agentforge-integrations = "agentforge_integrations.cli:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
