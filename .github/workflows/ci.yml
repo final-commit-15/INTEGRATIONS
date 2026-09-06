@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  lint:
+    name: Lint & typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -e ".[dev,prod]"
+      - name: Ruff check
+        run: ruff check .
+      - name: Black check (diff)
+        run: black --check --diff .
+      - name: Byte-compile
+        run: python -m compileall src
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      RATE_LIMIT_ENABLED: "false"
+      ENVIRONMENT: development
+      PYTHONPATH: src
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -e ".[dev,prod]"
+      - name: Run pytest
+        run: pytest tests/ -q --cov=src --cov-report=term-missing --cov-fail-under=0
+
+  build:
+    name: Build image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: agentforge-integrations:ci

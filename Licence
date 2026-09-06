@@ -1,0 +1,10 @@
+
+---
+
+## Source Code: `src/agentforge_integrations/`
+
+### `__init__.py`
+```python
+"""AgentForge Integrations - External execution layer."""
+
+__version__ = "0.1.0"

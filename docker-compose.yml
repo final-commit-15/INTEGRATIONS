@@ -1,0 +1,114 @@
+name: agentforge-integrations
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-agentforge}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-agentforge}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-agentforge}
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-agentforge}
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      WORKERS: ${WORKERS:-4}
+      PORT: ${PORT:-8000}
+      API_V1_PREFIX: ${API_V1_PREFIX:-/api/v1}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-8000}:8000"
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-agentforge}
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command: ["celery", "-A", "tasks.celery_app", "worker", "--loglevel=info", "--concurrency=4"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-agentforge}
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command: ["celery", "-A", "tasks.celery_app", "beat", "--loglevel=info"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
